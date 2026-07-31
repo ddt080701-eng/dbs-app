@@ -2,7 +2,7 @@
 // dbs 工具箱 Service Worker
 // 策略：缓存优先，网络回退
 // =============================================================================
-const SW_VERSION = 'dbs-app-v2.14.0';
+const SW_VERSION = 'dbs-app-v2.15.0';
 const CACHE_NAME = `dbs-cache-${SW_VERSION}`;
 
 // 需要预缓存的核心静态文件
