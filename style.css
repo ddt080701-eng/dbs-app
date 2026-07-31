@@ -772,6 +772,63 @@ select option { background: var(--card); color: var(--text); }
   line-height: 1.6;
 }
 
+/* ---------- 参考示例（好/差对比） ---------- */
+.ref-example {
+  margin: 10px 0;
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+}
+
+.ref-bad, .ref-good {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ref-bad {
+  background: rgba(232, 93, 93, 0.06);
+  border-bottom: 1px solid var(--border);
+}
+
+.ref-good {
+  background: rgba(111, 191, 115, 0.08);
+}
+
+.ref-label {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+}
+
+.ref-bad .ref-label {
+  color: var(--bad);
+  background: rgba(232, 93, 93, 0.1);
+}
+
+.ref-good .ref-label {
+  color: var(--ok);
+  background: rgba(111, 191, 115, 0.12);
+}
+
+.ref-text {
+  color: var(--text-2);
+  word-break: break-word;
+}
+
+.opt-tip-evidence {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 2px;
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+
 /* ===========================================================================
    首页底部小字
    =========================================================================== */

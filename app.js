@@ -912,7 +912,6 @@
           '<div class="result-card sev-' + sc + '">' +
           '<div class="rc-head">' +
           '<div class="rc-title">' + h.feature.severity + ' 特征' + h.feature.id + ' · ' + escapeHtml(h.feature.name) + '</div>' +
-          '<button class="copy-btn" data-copy="' + escapeAttr(h.snippet) + '">复制原文</button>' +
           '</div>' +
           '<div class="hit-snippet">' + escapeHtml(h.snippet) + '</div>' +
           '<div class="rc-desc">' + escapeHtml(h.detail) + '</div>' +
@@ -961,48 +960,8 @@
   }
 
   // ===========================================================================
-  // 工具 3：内容五维自检
+  // 工具 3：内容五维自检 — 学习型 + 检测型
   // ===========================================================================
-  var dimCheckState = {}; // dimId -> { checkIndex: bool }
-
-  function renderTool3Dims() {
-    var box = $('t3_dimensions');
-    box.innerHTML = '';
-    D.contentDimensions.forEach(function (dim) {
-      dimCheckState[dim.id] = {};
-      var card = el('div', 'dim-card');
-      card.setAttribute('data-dim', dim.id);
-      var html =
-        '<div class="dim-head">' +
-        '<div class="dim-name">' + dim.id + '. ' + escapeHtml(dim.name) + '</div>' +
-        '<div class="dim-judge" id="dim-judge-' + dim.id + '">未检查</div>' +
-        '</div>' +
-        '<div class="dim-guide">' + escapeHtml(dim.guide || '逐条自查，做到的打勾') + '</div>' +
-        '<div class="dim-checklist">';
-      dim.checks.forEach(function (c, i) {
-        dimCheckState[dim.id][i] = false;
-        html +=
-          '<div class="check-item" data-dim="' + dim.id + '" data-idx="' + i + '">' +
-          '<span class="check-box">&#10003;</span>' +
-          '<span class="check-text">' + escapeHtml(c) + '</span>' +
-          '</div>';
-      });
-      html += '</div>' +
-        '<div class="rc-desc" style="margin-top:8px;color:var(--text-3)">判定标准：' + escapeHtml(dim.judgment) + '</div>';
-      card.innerHTML = html;
-      box.appendChild(card);
-    });
-
-    // 绑定勾选
-    box.querySelectorAll('.check-item').forEach(function (item) {
-      item.addEventListener('click', function () {
-        var did = item.getAttribute('data-dim');
-        var idx = parseInt(item.getAttribute('data-idx'), 10);
-        dimCheckState[did][idx] = !dimCheckState[did][idx];
-        item.classList.toggle('checked', dimCheckState[did][idx]);
-      });
-    });
-  }
 
   // ===========================================================================
   // 内容分析引擎 — 读取用户实际文本，返回每项检测的真实结果
@@ -1206,7 +1165,7 @@
     var formatName = { image_text: '图文', short_video: '短视频', long_video: '长视频', live: '直播', article: '文章' }[format];
     var hasContent = content.length > 0;
 
-    // 有内容文本时自动分析；无内容时用手动勾选
+    // 有内容文本时自动分析
     var analysis = hasContent ? analyzeContent3(topic, content) : null;
 
     var reports = [];
@@ -1214,64 +1173,41 @@
     var weakestLevel = -1;
 
     D.contentDimensions.forEach(function (dim) {
-      var st = dimCheckState[dim.id] || {};
       var total = dim.checks.length;
       var checked = 0;
-      var checkResults = []; // 每项检测结果
+      var checkResults = [];
 
       if (analysis && analysis[dim.id]) {
-        // ===== 有内容文本：用自动分析结果 =====
         var checks = analysis[dim.id].checks;
         for (var ci = 0; ci < checks.length; ci++) {
           var passState = checks[ci].passed;
-          // passed === true → 通过；passed === false → 未通过；passed === null → 需人工确认（看勾选）
-          var isPass = (passState === true) || (passState === null && st[ci]);
+          var isPass = (passState === true) || (passState === null);
           if (isPass) checked++;
           checkResults.push({
             passed: isPass,
-            auto: passState !== null,
             evidence: checks[ci].evidence,
             suggestion: checks[ci].suggestion
           });
         }
       } else {
-        // ===== 无内容文本：用手动勾选 =====
-        for (var k in st) {
-          var isPass2 = st[k];
-          if (isPass2) checked++;
-          checkResults.push({
-            passed: isPass2,
-            auto: false,
-            evidence: isPass2 ? '已勾选确认' : '未勾选',
-            suggestion: null
-          });
+        for (var k = 0; k < total; k++) {
+          checkResults.push({ passed: null, evidence: null, suggestion: null });
         }
       }
 
-      var ratio = checked / total;
+      var ratio = total > 0 ? checked / total : 0;
       var status, cls, symbol;
       if (dim.id === 5) {
-        if (ratio >= 0.5) { status = '✅ 已规划 AI 工作流'; cls = 'dim-ok'; symbol = 'ok'; }
-        else { status = '⚠️ 需确定 AI 工作流'; cls = 'dim-warn'; symbol = 'warn'; }
+        if (ratio >= 0.5) { status = '✅ 已规划'; cls = 'ok'; symbol = 'ok'; }
+        else { status = '⚠️ 需确定'; cls = 'warn'; symbol = 'warn'; }
       } else {
-        if (ratio >= 2 / 3) { status = '✅'; cls = 'dim-ok'; symbol = 'ok'; }
-        else if (ratio >= 1 / 3) { status = '⚠️'; cls = 'dim-warn'; symbol = 'warn'; }
-        else { status = '❌'; cls = 'dim-bad'; symbol = 'bad'; }
-      }
-
-      // 更新卡片样式
-      var card = document.querySelector('.dim-card[data-dim="' + dim.id + '"]');
-      if (card) {
-        card.classList.remove('dim-ok', 'dim-warn', 'dim-bad');
-        card.classList.add(cls);
-        var j = $('dim-judge-' + dim.id);
-        if (j) j.textContent = status + '（' + checked + '/' + total + '）';
-        card.classList.add('dim-judged');
+        if (ratio >= 2 / 3) { status = '✅'; cls = 'ok'; symbol = 'ok'; }
+        else if (ratio >= 1 / 3) { status = '⚠️'; cls = 'warn'; symbol = 'warn'; }
+        else { status = '❌'; cls = 'bad'; symbol = 'bad'; }
       }
 
       reports.push({ dim: dim, status: status, checked: checked, total: total, symbol: symbol, checkResults: checkResults, hasAnalysis: !!analysis });
 
-      // 找最弱维度（非第5维优先）
       var level = symbol === 'ok' ? 0 : (symbol === 'warn' ? 1 : 2);
       if (dim.id !== 5 && level > weakestLevel) {
         weakestLevel = level;
@@ -1292,60 +1228,68 @@
     else overall = '基本可用，继续打磨';
 
     var html = '<div class="result-summary">选题「<strong>' + escapeHtml(topic) + '</strong>」 / 形式：<strong>' + formatName + '</strong>' +
-      (hasContent ? ' / 内容文本 ' + content.length + ' 字' : ' / 未粘贴内容（手动勾选模式）') + '<br>' +
+      (hasContent ? ' / 内容文本 ' + content.length + ' 字' : ' / 未粘贴内容（仅学习方法论）') + '<br>' +
       '五维结果：✅ ' + okCount + ' 项 · ⚠️ ' + warnCount + ' 项 · ❌ ' + badCount + ' 项<br>' +
       '<strong>总体诊断：' + escapeHtml(overall) + '</strong></div>';
 
-    // 逐维报告
+    // 逐维报告 — 学习型设计：每个维度展示方法论 + 参考示例 + 检测结果
     reports.forEach(function (r) {
       var sevCls = r.symbol === 'ok' ? 'ok' : (r.symbol === 'warn' ? 'warn' : 'red');
       html +=
         '<div class="result-card sev-' + sevCls + '">' +
         '<div class="rc-head">' +
         '<div class="rc-title">' + r.status + ' 维度' + r.dim.id + ' · ' + escapeHtml(r.dim.name) + '</div>' +
-        '<div class="rc-meta">' + r.checked + '/' + r.total + ' 达标</div>' +
+        '<div class="rc-meta">' + (r.hasAnalysis ? r.checked + '/' + r.total + ' 达标' : '方法论') + '</div>' +
         '</div>';
 
-      if (r.symbol === 'ok') {
-        html += '<div class="rc-desc">' + escapeHtml(r.dim.judgment) + '</div>';
-        // 达标维度也展示检测证据（如果有自动分析）
-        if (r.hasAnalysis) {
+      // 1. 方法论说明（每维都有，用户可以学习）
+      html += '<div class="rc-desc" style="margin-bottom:10px;font-size:14px;color:var(--text)">' + escapeHtml(r.dim.explanation) + '</div>';
+
+      // 2. 参考示例 — 差的 vs 好的
+      html += '<div class="ref-example">';
+      html += '<div class="ref-bad"><span class="ref-label">✗ 差的</span><span class="ref-text">' + escapeHtml(r.dim.badExample) + '</span></div>';
+      html += '<div class="ref-good"><span class="ref-label">✓ 好的</span><span class="ref-text">' + escapeHtml(r.dim.goodExample) + '</span></div>';
+      html += '</div>';
+
+      // 3. 检测结果（如果粘贴了内容文本）
+      if (r.hasAnalysis) {
+        var failCount = r.checkResults.filter(function (cr) { return !cr.passed; }).length;
+        if (failCount > 0) {
+          html += '<div class="opt-tips-label" style="margin-top:10px">你的内容检测结果</div>';
           r.checkResults.forEach(function (cr, idx) {
-            if (cr.evidence && cr.evidence !== '未输入内容文本' && cr.evidence !== '需人工确认') {
-              html += '<div class="opt-tip-check" style="margin-top:4px;color:var(--text-3)">✓ ' + escapeHtml(cr.evidence) + '</div>';
+            var checkText = r.dim.checks[idx] || '';
+            if (!cr.passed) {
+              html += '<div class="opt-tip-item">' +
+                '<div class="opt-tip-check">✗ ' + escapeHtml(checkText) + '</div>';
+              if (cr.evidence) {
+                html += '<div class="opt-tip-evidence">' + escapeHtml(cr.evidence) + '</div>';
+              }
+              if (cr.suggestion) {
+                html += '<div class="opt-tip-text">建议：' + escapeHtml(cr.suggestion) + '</div>';
+              }
+              html += '</div>';
+            } else {
+              html += '<div class="opt-tip-item" style="opacity:0.6">' +
+                '<div class="opt-tip-check">✓ ' + escapeHtml(checkText) + '</div>';
+              if (cr.evidence) {
+                html += '<div class="opt-tip-evidence">' + escapeHtml(cr.evidence) + '</div>';
+              }
+              html += '</div>';
             }
           });
+        } else if (r.symbol === 'ok') {
+          html += '<div class="opt-tip-check" style="margin-top:8px;color:var(--ok)">✓ 本维度全部通过</div>';
         }
       } else {
-        html += '<div class="rc-desc" style="margin-bottom:8px">' + escapeHtml(r.dim.judgment) + '</div>';
-        // 未达标：逐项展示检测证据 + 针对性建议
-        html += '<div class="opt-tips-label">检测详情 & 优化方向</div>';
-        r.checkResults.forEach(function (cr, idx) {
-          var checkText = r.dim.checks[idx] || '';
-          if (cr.passed) {
-            // 通过的项简短显示
-            html += '<div class="opt-tip-item" style="opacity:0.6">' +
-              '<div class="opt-tip-check">✓ ' + escapeHtml(checkText) + '</div>' +
-              (cr.evidence && cr.evidence !== '已勾选确认' ? '<div class="opt-tip-evidence">' + escapeHtml(cr.evidence) + '</div>' : '') +
-              '</div>';
-          } else {
-            // 未通过的项详细展示
-            html += '<div class="opt-tip-item">' +
-              '<div class="opt-tip-check">✗ ' + escapeHtml(checkText) + '</div>';
-            if (cr.evidence && cr.evidence !== '未勾选' && cr.evidence !== '未输入内容文本') {
-              html += '<div class="opt-tip-evidence">证据：' + escapeHtml(cr.evidence) + '</div>';
-            }
-            if (cr.suggestion) {
-              html += '<div class="opt-tip-text">建议：' + escapeHtml(cr.suggestion) + '</div>';
-            } else {
-              // 无自动分析时使用静态 tips
-              var tipText = (r.dim.tips && r.dim.tips[idx]) ? r.dim.tips[idx] : '对照该项标准优化你的内容';
-              html += '<div class="opt-tip-text">' + escapeHtml(tipText) + '</div>';
-            }
-            html += '</div>';
-          }
+        // 未粘贴内容时展示判定标准和方法论 tips
+        html += '<div class="opt-tips-label" style="margin-top:10px">判定标准</div>';
+        html += '<div class="rc-desc" style="color:var(--text-3)">' + escapeHtml(r.dim.judgment) + '</div>';
+        html += '<div class="opt-tips-label" style="margin-top:8px">怎么做</div>';
+        r.dim.tips.forEach(function (tip) {
+          html += '<div class="opt-tip-text" style="margin-bottom:4px">· ' + escapeHtml(tip) + '</div>';
         });
       }
+
       html += '</div>';
     });
 
@@ -1614,7 +1558,6 @@
   // 初始化
   // -------------------------------------------------------------------------
   function init() {
-    renderTool3Dims();
     bindInputAutosave();
     bindEvents();
     initCardGrid();
