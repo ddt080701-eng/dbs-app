@@ -1,0 +1,26 @@
+{
+  "name": "dbs 工具箱",
+  "short_name": "dbs",
+  "description": "dontbesilent 商业工具箱 — 标题公式、AI 写作检测、内容五维自检、开头优化",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#6B4EE6",
+  "background_color": "#F5F0E8",
+  "start_url": "./",
+  "scope": "./",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20512%20512'%3E%3Crect%20width='512'%20height='512'%20rx='112'%20fill='%23F5F0E8'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='100'%20fill='none'%20stroke='%236B4EE6'%20stroke-width='40'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='30'%20fill='%236B4EE6'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20512%20512'%3E%3Crect%20width='512'%20height='512'%20rx='112'%20fill='%23F5F0E8'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='100'%20fill='none'%20stroke='%236B4EE6'%20stroke-width='40'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='30'%20fill='%236B4EE6'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

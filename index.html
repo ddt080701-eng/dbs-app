@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#6B4EE6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="dbs">
+  <meta name="description" content="dontbesilent 商业工具箱 — 标题公式、AI 写作检测、内容五维自检、开头优化">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20512%20512'%3E%3Crect%20width='512'%20height='512'%20rx='112'%20fill='%23F5F0E8'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='100'%20fill='none'%20stroke='%236B4EE6'%20stroke-width='40'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='30'%20fill='%236B4EE6'/%3E%3C/svg%3E">
+  <title>dbs 工具箱</title>
+  <link rel="stylesheet" href="./style.css">
+  <script>window.GSAP_READY = false;</script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" onload="window.GSAP_READY=true" onerror="console.warn('[GSAP] load failed, FlowingMenu will use CSS fallback')"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- ====== 返回菜单按钮（仅工具页显示）====== -->
+    <button class="back-to-menu" id="backBtn" aria-label="返回菜单">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+
+    <!-- ====== 主内容区 ====== -->
+    <main class="app-main" id="appMain">
+
+      <!-- 2x2 卡片网格首页 -->
+      <section class="view active" id="viewMenu">
+        <div class="home-header">
+          <h1 class="home-title">dbs 工具箱</h1>
+          <p class="home-subtitle">dontbesilent 商业内容工具</p>
+        </div>
+        <div class="card-grid" id="cardGrid">
+          <div class="tool-card-grid" data-tool="1">
+            <div class="tcg-img-wrap">
+              <img src="./img/tool1.jpg" alt="标题公式匹配器" loading="lazy">
+            </div>
+            <div class="tcg-text">
+              <div class="tcg-name">标题公式匹配器</div>
+              <div class="tcg-desc">75 个爆款公式匹配</div>
+            </div>
+          </div>
+          <div class="tool-card-grid" data-tool="2">
+            <div class="tcg-img-wrap">
+              <img src="./img/tool2.jpg" alt="AI 写作检测器" loading="lazy">
+            </div>
+            <div class="tcg-text">
+              <div class="tcg-name">AI 写作检测器</div>
+              <div class="tcg-desc">22 条 AI 特征扫描</div>
+            </div>
+          </div>
+          <div class="tool-card-grid" data-tool="3">
+            <div class="tcg-img-wrap">
+              <img src="./img/tool3.jpg" alt="内容五维自检" loading="lazy">
+            </div>
+            <div class="tcg-text">
+              <div class="tcg-name">内容五维自检</div>
+              <div class="tcg-desc">逐维诊断与建议</div>
+            </div>
+          </div>
+          <div class="tool-card-grid" data-tool="4">
+            <div class="tcg-img-wrap">
+              <img src="./img/tool4.jpg" alt="开头优化方案" loading="lazy">
+            </div>
+            <div class="tcg-text">
+              <div class="tcg-name">开头优化方案</div>
+              <div class="tcg-desc">诊断开头输出优化</div>
+            </div>
+          </div>
+        </div>
+        <footer class="home-footer">
+          <span class="home-pm">PM：滴沥嘻嘻嘻</span>
+        </footer>
+      </section>
+
+      <!-- 工具1：标题公式匹配器 -->
+      <section class="view" id="viewTool1">
+        <div class="tool-spotlight" data-spotlight>
+          <div class="tool-view-head">
+            <div class="tvh-title">标题公式匹配器</div>
+            <div class="tvh-desc">输入话题和行业，从 75 个爆款公式中匹配最合适的标题</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">话题<span class="required">*</span></label>
+            <input type="text" id="t1_topic" placeholder="例如：小红书涨粉技巧" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label class="form-label">行业</label>
+            <input type="text" id="t1_industry" placeholder="例如：美妆 / 健身 / 创业" autocomplete="off">
+          </div>
+          <button class="btn" id="t1_run">匹配标题公式</button>
+          <div class="result-area" id="t1_result"></div>
+        </div>
+      </section>
+
+      <!-- 工具2：AI 写作检测器 -->
+      <section class="view" id="viewTool2">
+        <div class="tool-spotlight" data-spotlight>
+          <div class="tool-view-head">
+            <div class="tvh-title">AI 写作检测器</div>
+            <div class="tvh-desc">粘贴文案，检测 22 条 AI 写作特征</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">文案内容<span class="required">*</span></label>
+            <textarea class="large" id="t2_text" placeholder="粘贴你的文案到这里..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">体裁</label>
+            <select id="t2_genre">
+              <option value="short_video">短视频文稿</option>
+              <option value="article">公众号长文</option>
+              <option value="tweet">推文</option>
+              <option value="academic">学术</option>
+            </select>
+          </div>
+          <button class="btn" id="t2_run">开始检测</button>
+          <div class="result-area" id="t2_result"></div>
+        </div>
+      </section>
+
+      <!-- 工具3：内容五维自检 -->
+      <section class="view" id="viewTool3">
+        <div class="tool-spotlight" data-spotlight>
+          <div class="tool-view-head">
+            <div class="tvh-title">内容五维自检</div>
+            <div class="tvh-desc">逐维检查选题和内容，输出诊断报告与行动建议</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">选题<span class="required">*</span></label>
+            <input type="text" id="t3_topic" placeholder="你的选题是什么" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label class="form-label">内容形式</label>
+            <select id="t3_format">
+              <option value="image_text">图文</option>
+              <option value="short_video">短视频</option>
+              <option value="long_video">长视频</option>
+              <option value="live">直播</option>
+              <option value="article">文章</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">内容文本（可选）</label>
+            <textarea id="t3_text" placeholder="如果有成稿可以粘贴过来..."></textarea>
+          </div>
+          <div id="t3_dimensions"></div>
+          <div class="btn-row" style="margin-top:14px">
+            <button class="btn" id="t3_run">生成诊断报告</button>
+          </div>
+          <div class="result-area" id="t3_result"></div>
+        </div>
+      </section>
+
+      <!-- 工具4：开头优化方案 -->
+      <section class="view" id="viewTool4">
+        <div class="tool-spotlight" data-spotlight>
+          <div class="tool-view-head">
+            <div class="tvh-title">开头优化方案</div>
+            <div class="tvh-desc">诊断开头问题，输出优化方向</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">当前开头文本<span class="required">*</span></label>
+            <textarea class="large" id="t4_text" placeholder="粘贴你的开头文本..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">内容形式</label>
+            <select id="t4_format">
+              <option value="short_video">短视频</option>
+              <option value="image_text">图文</option>
+              <option value="long_article">长文</option>
+            </select>
+          </div>
+          <button class="btn" id="t4_run">生成优化方案</button>
+          <div class="result-area" id="t4_result"></div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 底部导航已移除：工具页通过左上角返回按钮回到首页 -->
+  </div>
+
+  <script src="./data.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
