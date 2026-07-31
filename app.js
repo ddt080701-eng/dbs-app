@@ -931,9 +931,199 @@
     });
   }
 
+  // ===========================================================================
+  // 内容分析引擎 — 读取用户实际文本，返回每项检测的真实结果
+  // 核心原则：不同内容 → 不同检测结果 → 不同建议
+  // ===========================================================================
+  function analyzeContent3(topic, content) {
+    var text = (content || '').trim();
+    var topicT = (topic || '').trim();
+    var hasText = text.length > 0;
+    var analysis = {}; // dimId -> { checks: [{ passed, evidence, suggestion }] }
+
+    // ===== 维度1: 文字洁癖 =====
+    analysis[1] = { checks: [] };
+
+    if (hasText) {
+      // --- Check 1: AI 味检测 ---
+      var aiBuzz = ['赋能', '闭环', '底层逻辑', '抓手', '打法', '赛道', '心智', '认知升级', '信息茧房', '飞轮', '护城河', '破圈', '链路', '沉淀', '复用', '体系化', '方法论', '矩阵', '触达', '降本增效'];
+      var aiConn = ['首先', '其次', '最后', '总而言之', '综上所述', '在当今', '时代', '众所周知', '不可否认', '值得注意的是'];
+      var foundBuzz = aiBuzz.filter(function (w) { return text.indexOf(w) !== -1; });
+      var foundConn = aiConn.filter(function (w) { return text.indexOf(w) !== -1; });
+      var emojiRe = /[\u{1F300}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu;
+      var emojiCount = (text.match(emojiRe) || []).length;
+      var clauses = text.split(/[，；。！？\n]/).filter(function (s) { return s.trim().length >= 4 && s.trim().length <= 15; });
+      var hasParallel = clauses.length >= 4;
+
+      var aiScore = foundBuzz.length * 2 + foundConn.length + (emojiCount > 3 ? emojiCount : 0) + (hasParallel ? 2 : 0);
+      var ev1, sg1;
+      if (foundBuzz.length > 0) {
+        ev1 = '检测到 AI 套话：「' + foundBuzz.slice(0, 4).join('」「') + '」';
+        sg1 = '把「' + foundBuzz[0] + '」换成你嘴上会说的词——比如「闭环」→「跑通」，「底层逻辑」→「关键在哪」';
+      } else if (foundConn.length > 0) {
+        ev1 = '检测到 AI 连接词：「' + foundConn.slice(0, 3).join('」「') + '」';
+        sg1 = '删掉「' + foundConn[0] + '」这类过渡词，直接说结论';
+      } else if (emojiCount > 3) {
+        ev1 = 'Emoji 堆叠：' + emojiCount + ' 个';
+        sg1 = '删掉多余 Emoji，每段最多留 1 个';
+      } else if (hasParallel) {
+        ev1 = '检测到 ' + clauses.length + ' 个长度接近的短句排比';
+        sg1 = '把排比打散，中间加一句 3-4 字的短句断节奏';
+      } else {
+        ev1 = '未检测到明显 AI 味';
+        sg1 = '内容较干净，继续保持';
+      }
+      analysis[1].checks.push({ passed: aiScore === 0, evidence: ev1, suggestion: sg1 });
+
+      // --- Check 2: 干货陷阱（术语堆砌） ---
+      var jargonRe = /[a-zA-Z]{3,}/g;
+      var jargonCount = (text.match(jargonRe) || []).length;
+      var numDense = (text.match(/\d+/g) || []).length;
+      var jargonRatio = text.length > 0 ? (jargonCount + numDense) / (text.length / 100) : 0;
+      analysis[1].checks.push({
+        passed: jargonRatio < 3,
+        evidence: jargonRatio >= 3 ? '每 100 字有 ' + Math.round(jargonRatio) + ' 个术语/数字，密度过高' : '术语密度正常（' + Math.round(jargonRatio) + '/100 字）',
+        suggestion: jargonRatio >= 3 ? '删掉一半术语和数据，只留 1 个你真正用来想事情的核心词' : '保持现状'
+      });
+
+      // --- Check 3: 公共可验证（抽象表述检测） ---
+      var abstractWords = ['本质', '核心', '关键', '根本', '底层', '深层', '内在', '终极', '真正'];
+      var foundAbstract = abstractWords.filter(function (w) { return text.indexOf(w) !== -1; });
+      var hasConcrete = text.indexOf('我') !== -1 || /昨天|上周|去年|前年/.test(text) || /\d+(元|块|斤|天|小时|分钟|%)?/.test(text);
+      analysis[1].checks.push({
+        passed: foundAbstract.length <= 1 && hasConcrete,
+        evidence: foundAbstract.length > 1 ? '检测到抽象词：「' + foundAbstract.slice(0, 3).join('」「') + '」' :
+          !hasConcrete ? '未检测到具体案例、数据或个人经历' : '有具体表述，可验证',
+        suggestion: foundAbstract.length > 1 ? '把「' + foundAbstract[0] + '」替换成一个具体例子或数据' :
+          !hasConcrete ? '加一个你自己的经历或具体数字，让读者能验证' : '继续保持'
+      });
+    } else {
+      analysis[1].checks.push({ passed: null, evidence: '未输入内容文本', suggestion: '粘贴你的内容文本，系统会自动检测 AI 味' });
+      analysis[1].checks.push({ passed: null, evidence: '未输入内容文本', suggestion: '粘贴内容后自动检测术语密度' });
+      analysis[1].checks.push({ passed: null, evidence: '未输入内容文本', suggestion: '粘贴内容后检测抽象表述' });
+    }
+
+    // ===== 维度2: 封面/标题 =====
+    analysis[2] = { checks: [] };
+    var topicHasNum = /\d/.test(topicT);
+    var topicPain = ['为什么', '别', '千万别', '错误', '危险', '警告', '后悔', '亏', '坑', '避坑', '别做', '毁', '烂'];
+    var topicCuriosity = ['秘密', '不会告诉', '想不到', '隐藏', '其实', '真相', '反而'];
+    var topicEmotion = topicPain.concat(topicCuriosity);
+    var foundEmotion = topicEmotion.filter(function (w) { return topicT.indexOf(w) !== -1; });
+    var topicLen = topicT.length;
+
+    analysis[2].checks.push({
+      passed: foundEmotion.length > 0 || topicHasNum,
+      evidence: topicLen === 0 ? '未输入选题' :
+        foundEmotion.length > 0 ? '标题有情绪触发词：「' + foundEmotion[0] + '」' :
+        topicHasNum ? '标题含数字，有锚定效果' : '标题平铺直叙，缺少情绪触发',
+      suggestion: topicLen > 0 && foundEmotion.length === 0 && !topicHasNum ?
+        '你的选题「' + topicT.slice(0, 12) + '」可以改成：为什么' + topicT.slice(0, 8) + '其实是错的' :
+        '标题已有吸引力'
+    });
+
+    analysis[2].checks.push({
+      passed: topicLen > 0 && topicLen <= 20,
+      evidence: topicLen === 0 ? '未输入选题' :
+        topicLen > 20 ? '选题 ' + topicLen + ' 字，作为封面文字偏长' : '选题长度 ' + topicLen + ' 字，适合封面排版',
+      suggestion: topicLen > 20 ? '封面文字控制在 15 字以内，把长标题拆成主标题+副标题' : '保持现状'
+    });
+
+    analysis[2].checks.push({
+      passed: foundEmotion.length > 0,
+      evidence: foundEmotion.length > 0 ? '检测到情绪词：「' + foundEmotion.slice(0, 2).join('」「') + '」' :
+        topicLen === 0 ? '未输入选题' : '标题偏信息传递，缺少情绪冲击',
+      suggestion: topicLen > 0 && foundEmotion.length === 0 ?
+        '在标题中加入「为什么」「千万别」「真相」等情绪触发词' : '情绪冲击足够'
+    });
+
+    // ===== 维度3: 表达效率 =====
+    analysis[3] = { checks: [] };
+    if (hasText) {
+      var sents = text.split(/[。！？\n]/).filter(function (s) { return s.trim().length > 0; });
+      var firstSent = sents.length > 0 ? sents[0].trim() : '';
+      var pointMarkers = ['其实', '本质上', '核心是', '关键是', '重点是', '说白了', '秘诀', '真相', '方法', '因为', '所以'];
+      var hasPointEarly = pointMarkers.some(function (p) { return firstSent.indexOf(p) !== -1; });
+
+      analysis[3].checks.push({
+        passed: firstSent.length > 0 && (firstSent.length <= 40 || hasPointEarly),
+        evidence: firstSent.length > 40 && !hasPointEarly ?
+          '首句 ' + firstSent.length + ' 字，过长且无观点标记' :
+          hasPointEarly ? '首句有观点信号' : '首句长度适中（' + firstSent.length + ' 字）',
+        suggestion: firstSent.length > 40 && !hasPointEarly ?
+          '把核心观点提到第一句，首句控制在 40 字以内' : '保持现状'
+      });
+
+      var fillerWords = ['众所周知', '不可否认', '在当今', '随着', '首先', '其次', '最后', '总而言之', '综上所述', '毫无疑问', '值得注意的是'];
+      var foundFiller = fillerWords.filter(function (w) { return text.indexOf(w) !== -1; });
+      analysis[3].checks.push({
+        passed: foundFiller.length <= 1,
+        evidence: foundFiller.length > 1 ? '检测到 ' + foundFiller.length + ' 处套话铺垫：「' + foundFiller.slice(0, 3).join('」「') + '」' : '无过度套话包装',
+        suggestion: foundFiller.length > 1 ? '删掉「' + foundFiller[0] + '」等套话，直接进入正题' : '保持现状'
+      });
+
+      var ctaWords = ['关注', '点赞', '收藏', '评论', '私信', '下单', '购买', '链接', '主页', '咨询', '领取', '获取', '留言', '转发'];
+      var hasCTA = ctaWords.some(function (w) { return text.indexOf(w) !== -1; });
+      analysis[3].checks.push({
+        passed: hasCTA,
+        evidence: hasCTA ? '检测到行动号召词' : '未检测到明确的行动号召',
+        suggestion: !hasCTA ? '在结尾加一句明确的行动号召（关注/点赞/收藏/私信等），让读者知道下一步做什么' : '保持现状'
+      });
+    } else {
+      analysis[3].checks.push({ passed: null, evidence: '未输入内容文本', suggestion: '粘贴内容后检测核心观点前置' });
+      analysis[3].checks.push({ passed: null, evidence: '未输入内容文本', suggestion: '粘贴内容后检测过度包装' });
+      analysis[3].checks.push({ passed: null, evidence: '未输入内容文本', suggestion: '粘贴内容后检测变现目标' });
+    }
+
+    // ===== 维度4: 认知落差 =====
+    analysis[4] = { checks: [] };
+    if (hasText) {
+      var vagueWords = ['等等', '之类的', '诸如此类', '一些', '很多', '不少', '各种'];
+      var foundVague = vagueWords.filter(function (w) { return text.indexOf(w) !== -1; });
+      var specificSignals = ['第一步', '第二步', '具体来说', '举个例子', '比如', '我自己的经验', '我试过'];
+      var foundSpecific = specificSignals.filter(function (w) { return text.indexOf(w) !== -1; });
+      analysis[4].checks.push({
+        passed: foundVague.length <= 1 && foundSpecific.length > 0,
+        evidence: foundVague.length > 1 ? '检测到模糊表述：「' + foundVague.slice(0, 2).join('」「') + '」' :
+          foundSpecific.length > 0 ? '有具体表述信号' : '表述不够具体，缺少「举个例子」类信号',
+        suggestion: foundVague.length > 1 ? '删掉「' + foundVague[0] + '」等模糊词，换成具体数字或步骤' :
+          foundSpecific.length === 0 ? '加一个「比如」开头的具体例子' : '保持现状'
+      });
+
+      var counterWords = ['其实', '真相', '不是', '反而', '错了', '误区', '没想到', '想不到', '大多数人都', '你以为', '看起来'];
+      var foundCounter = counterWords.filter(function (w) { return text.indexOf(w) !== -1; });
+      analysis[4].checks.push({
+        passed: foundCounter.length > 0,
+        evidence: foundCounter.length > 0 ? '检测到反常识信号：「' + foundCounter[0] + '」' : '未检测到反常识/认知落差标记',
+        suggestion: foundCounter.length === 0 ? '加一个「其实…」「真相是…」「大多数人都以为…但…」的反常识转折' : '保持现状'
+      });
+
+      var personalMarkers = ['我发现', '我的经验', '我试过', '我之前', '我去', '我做过', '我自己'];
+      var foundPersonal = personalMarkers.filter(function (w) { return text.indexOf(w) !== -1; });
+      analysis[4].checks.push({
+        passed: foundPersonal.length > 0,
+        evidence: foundPersonal.length > 0 ? '有个人经验标记：「' + foundPersonal[0] + '」' : '缺少个人经验或独特视角的标记',
+        suggestion: foundPersonal.length === 0 ? '加入你的个人经历或独家数据，让内容只有你能说' : '保持现状'
+      });
+    } else {
+      analysis[4].checks.push({ passed: null, evidence: '未输入内容文本', suggestion: '粘贴内容后检测表达清晰度' });
+      analysis[4].checks.push({ passed: null, evidence: '未输入内容文本', suggestion: '粘贴内容后检测认知落差' });
+      analysis[4].checks.push({ passed: null, evidence: '未输入内容文本', suggestion: '粘贴内容后检测独特性' });
+    }
+
+    // ===== 维度5: AI 辅助创作（依赖人工规划） =====
+    analysis[5] = { checks: [] };
+    for (var i = 0; i < 4; i++) {
+      analysis[5].checks.push({ passed: null, evidence: '需人工确认', suggestion: '根据内容类型选择对应的 AI 工作流' });
+    }
+
+    return analysis;
+  }
+
   function runTool3() {
     var topic = $('t3_topic').value.trim();
     var format = $('t3_format').value;
+    var content = $('t3_text').value.trim();
     var result = $('t3_result');
     if (!topic) {
       result.innerHTML = '<div class="empty-state">请输入选题</div>';
@@ -941,18 +1131,48 @@
     }
 
     var formatName = { image_text: '图文', short_video: '短视频', long_video: '长视频', live: '直播', article: '文章' }[format];
+    var hasContent = content.length > 0;
+
+    // 有内容文本时自动分析；无内容时用手动勾选
+    var analysis = hasContent ? analyzeContent3(topic, content) : null;
+
     var reports = [];
     var weakest = null;
-    var weakestLevel = -1; // 0 ok,1 warn,2 bad — 初始 -1 确保任何等级都能被捕获
+    var weakestLevel = -1;
 
     D.contentDimensions.forEach(function (dim) {
       var st = dimCheckState[dim.id] || {};
       var total = dim.checks.length;
       var checked = 0;
-      var uncheckedItems = []; // 未勾选项的索引
-      for (var k in st) {
-        if (st[k]) { checked++; }
-        else { uncheckedItems.push(parseInt(k, 10)); }
+      var checkResults = []; // 每项检测结果
+
+      if (analysis && analysis[dim.id]) {
+        // ===== 有内容文本：用自动分析结果 =====
+        var checks = analysis[dim.id].checks;
+        for (var ci = 0; ci < checks.length; ci++) {
+          var passState = checks[ci].passed;
+          // passed === true → 通过；passed === false → 未通过；passed === null → 需人工确认（看勾选）
+          var isPass = (passState === true) || (passState === null && st[ci]);
+          if (isPass) checked++;
+          checkResults.push({
+            passed: isPass,
+            auto: passState !== null,
+            evidence: checks[ci].evidence,
+            suggestion: checks[ci].suggestion
+          });
+        }
+      } else {
+        // ===== 无内容文本：用手动勾选 =====
+        for (var k in st) {
+          var isPass2 = st[k];
+          if (isPass2) checked++;
+          checkResults.push({
+            passed: isPass2,
+            auto: false,
+            evidence: isPass2 ? '已勾选确认' : '未勾选',
+            suggestion: null
+          });
+        }
       }
 
       var ratio = checked / total;
@@ -976,7 +1196,7 @@
         card.classList.add('dim-judged');
       }
 
-      reports.push({ dim: dim, status: status, checked: checked, total: total, symbol: symbol, uncheckedItems: uncheckedItems });
+      reports.push({ dim: dim, status: status, checked: checked, total: total, symbol: symbol, checkResults: checkResults, hasAnalysis: !!analysis });
 
       // 找最弱维度（非第5维优先）
       var level = symbol === 'ok' ? 0 : (symbol === 'warn' ? 1 : 2);
@@ -998,11 +1218,12 @@
     else if (okCount >= 4) overall = '选题已就绪，可以开始创作';
     else overall = '基本可用，继续打磨';
 
-    var html = '<div class="result-summary">选题「<strong>' + escapeHtml(topic) + '</strong>」 / 形式：<strong>' + formatName + '</strong><br>' +
+    var html = '<div class="result-summary">选题「<strong>' + escapeHtml(topic) + '</strong>」 / 形式：<strong>' + formatName + '</strong>' +
+      (hasContent ? ' / 内容文本 ' + content.length + ' 字' : ' / 未粘贴内容（手动勾选模式）') + '<br>' +
       '五维结果：✅ ' + okCount + ' 项 · ⚠️ ' + warnCount + ' 项 · ❌ ' + badCount + ' 项<br>' +
       '<strong>总体诊断：' + escapeHtml(overall) + '</strong></div>';
 
-    // 逐维 — 未达标的维度输出具体优化方向
+    // 逐维报告
     reports.forEach(function (r) {
       var sevCls = r.symbol === 'ok' ? 'ok' : (r.symbol === 'warn' ? 'warn' : 'red');
       html +=
@@ -1013,23 +1234,44 @@
         '</div>';
 
       if (r.symbol === 'ok') {
-        // 达标的维度只显示判定标准
         html += '<div class="rc-desc">' + escapeHtml(r.dim.judgment) + '</div>';
-      } else {
-        // 未达标：列出未通过项 + 对应优化方向
-        html += '<div class="rc-desc" style="margin-bottom:8px">' + escapeHtml(r.dim.judgment) + '</div>';
-        if (r.uncheckedItems.length > 0) {
-          html += '<div class="opt-tips-label">优化方向</div>';
-          r.uncheckedItems.forEach(function (idx) {
-            var checkText = r.dim.checks[idx] || '';
-            var tipText = (r.dim.tips && r.dim.tips[idx]) ? r.dim.tips[idx] : '对照该项标准优化你的内容';
-            html +=
-              '<div class="opt-tip-item">' +
-              '<div class="opt-tip-check">未通过：' + escapeHtml(checkText) + '</div>' +
-              '<div class="opt-tip-text">' + escapeHtml(tipText) + '</div>' +
-              '</div>';
+        // 达标维度也展示检测证据（如果有自动分析）
+        if (r.hasAnalysis) {
+          r.checkResults.forEach(function (cr, idx) {
+            if (cr.evidence && cr.evidence !== '未输入内容文本' && cr.evidence !== '需人工确认') {
+              html += '<div class="opt-tip-check" style="margin-top:4px;color:var(--text-3)">✓ ' + escapeHtml(cr.evidence) + '</div>';
+            }
           });
         }
+      } else {
+        html += '<div class="rc-desc" style="margin-bottom:8px">' + escapeHtml(r.dim.judgment) + '</div>';
+        // 未达标：逐项展示检测证据 + 针对性建议
+        html += '<div class="opt-tips-label">检测详情 & 优化方向</div>';
+        r.checkResults.forEach(function (cr, idx) {
+          var checkText = r.dim.checks[idx] || '';
+          if (cr.passed) {
+            // 通过的项简短显示
+            html += '<div class="opt-tip-item" style="opacity:0.6">' +
+              '<div class="opt-tip-check">✓ ' + escapeHtml(checkText) + '</div>' +
+              (cr.evidence && cr.evidence !== '已勾选确认' ? '<div class="opt-tip-evidence">' + escapeHtml(cr.evidence) + '</div>' : '') +
+              '</div>';
+          } else {
+            // 未通过的项详细展示
+            html += '<div class="opt-tip-item">' +
+              '<div class="opt-tip-check">✗ ' + escapeHtml(checkText) + '</div>';
+            if (cr.evidence && cr.evidence !== '未勾选' && cr.evidence !== '未输入内容文本') {
+              html += '<div class="opt-tip-evidence">证据：' + escapeHtml(cr.evidence) + '</div>';
+            }
+            if (cr.suggestion) {
+              html += '<div class="opt-tip-text">建议：' + escapeHtml(cr.suggestion) + '</div>';
+            } else {
+              // 无自动分析时使用静态 tips
+              var tipText = (r.dim.tips && r.dim.tips[idx]) ? r.dim.tips[idx] : '对照该项标准优化你的内容';
+              html += '<div class="opt-tip-text">' + escapeHtml(tipText) + '</div>';
+            }
+            html += '</div>';
+          }
+        });
       }
       html += '</div>';
     });
@@ -1039,13 +1281,13 @@
     if (!weakest || weakest.symbol === 'ok') {
       action = '选题已就绪。先写一个最小可用版本（比如一条短视频的开头 30 秒），跑通再说。';
     } else {
-      var map = {
+      var actionMap = {
         1: '先清洗 AI 味：把空话套话和堆砌的术语删掉，用你嘴上会说的词重写一遍。',
         2: '先重做封面和标题：标题要做到「认知落差」，封面要在 0.5 秒内传达核心。',
         3: '先砍掉 50% 内容：把核心观点提到最前面，删掉所有不直接服务核心的铺垫。',
         4: '先找到同行的同类内容，明确你的差异化在哪——如果没有落差，先别做。'
       };
-      action = map[weakest.dim.id] || '先解决最弱的维度。';
+      action = actionMap[weakest.dim.id] || '先解决最弱的维度。';
     }
     html += '<div class="action-suggestion"><div class="as-label">第一步做什么</div><div class="as-text">' + escapeHtml(action) + '</div></div>';
 
