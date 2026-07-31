@@ -135,8 +135,7 @@ body {
 .back-to-menu {
   position: fixed;
   top: calc(16px + env(safe-area-inset-top, 0));
-  left: 50%;
-  transform: translateX(-50%) translateX(calc(var(--maxw) / -2 + 20px));
+  left: calc(16px + env(safe-area-inset-left, 0));
   width: 46px;
   height: 46px;
   border-radius: 50%;
@@ -160,7 +159,7 @@ body {
 }
 
 .back-to-menu:active {
-  transform: translateX(-50%) translateX(calc(var(--maxw) / -2 + 20px)) scale(0.90);
+  transform: scale(0.90);
 }
 
 .view {
@@ -814,15 +813,6 @@ select option { background: var(--card); color: var(--text); }
   .tool-spotlight { padding: 36px 32px; }
 
   #app { box-shadow: 0 0 60px rgba(45, 52, 54, 0.08); }
-
-  /* 桌面端返回按钮随容器放大偏移 */
-  .back-to-menu {
-    transform: translateX(-50%) translateX(calc(560px / -2 + 24px));
-  }
-
-  .back-to-menu:active {
-    transform: translateX(-50%) translateX(calc(560px / -2 + 24px)) scale(0.90);
-  }
 }
 
 /* 桌面端 — 进一步优化间距 */
@@ -838,14 +828,6 @@ select option { background: var(--card); color: var(--text); }
 
   .tool-card-grid:hover {
     transform: translateY(-4px);
-  }
-
-  .back-to-menu {
-    transform: translateX(-50%) translateX(calc(600px / -2 + 24px));
-  }
-
-  .back-to-menu:active {
-    transform: translateX(-50%) translateX(calc(600px / -2 + 24px)) scale(0.90);
   }
 }
 

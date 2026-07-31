@@ -250,7 +250,10 @@
       '自媒体': ['涨粉', '小红书', '自媒体'],
       '小红书': ['涨粉', '自媒体', '小红书'],
       '学习': ['阅读', '考试', '学习'],
-      '健康': ['健身', '减肥', '运动', '健康']
+      '健康': ['健身', '减肥', '运动', '健康'],
+      '法律': ['律师', '法律咨询', '合同', '维权', '官司', '法律知识', '法律风险', '普法', '法律'],
+      '律师': ['法律', '法律咨询', '合同', '维权', '官司', '普法', '律师'],
+      '教育': ['育儿', '学习', '考试', '培训', '教育']
     };
 
     function pickExample(f) {
@@ -771,6 +774,9 @@
       return;
     }
 
+    var textLen = text.trim().length;
+    var isShort = textLen < 80;
+
     var skipMap = {
       short_video: [13],
       tweet: [14]
@@ -831,7 +837,18 @@
       (skip.length ? '（已按体裁跳过特征 ' + skip.join('、') + '）' : '') + '</div>';
 
     if (allHits.length === 0) {
-      html += '<div class="empty-state">未检测到明显 AI 写作特征，或文案较短。<br>注意：本检测为规则启发式，仅供参考。</div>';
+      if (isShort) {
+        html += '<div class="result-card sev-warn" style="border-left-color: var(--accent);">' +
+          '<div class="rc-head"><div class="rc-title">文案过短，无法有效检测</div></div>' +
+          '<div class="rc-desc">当前文案仅 <strong>' + textLen + '</strong> 字，部分检测特征需要至少 <strong>80 字</strong>才能生效。</div>' +
+          '<div class="opt-tips-label">建议</div>' +
+          '<div class="opt-tip-item">' +
+          '<div class="opt-tip-text">请粘贴更完整的文案（建议 80 字以上），系统会检测 AI 套话、连接词、排比句式、情绪曲线等特征。</div>' +
+          '</div>' +
+          '</div>';
+      } else {
+        html += '<div class="empty-state">未检测到明显 AI 写作特征。<br>注意：本检测为规则启发式，仅供参考。</div>';
+      }
     } else {
       allHits.forEach(function (h, i) {
         var sc = severityCode(h.feature.severity);
