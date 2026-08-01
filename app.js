@@ -214,6 +214,161 @@
     { cats: ['好奇缺口'], keys: ['秘密', '不会告诉你', '想不到', '隐藏'] }
   ];
 
+  // --- 话题简化：去掉常见前缀，提取核心关键词 ---
+  function simplifyTopic(topic) {
+    var t = (topic || '').trim();
+    t = t.replace(/^(分享我的|分享我|分享|记录我的|记录我|记录|我的|我的一周|一周的|如何|怎么|怎样|为什么|关于|聊聊|谈谈|说说我|说说|带你看|带你|今天来|今天聊聊)/, '');
+    if (t.length > 8) t = t.slice(0, 6);
+    return t || (topic || '').trim();
+  }
+
+  // --- 从行业示例中提取槽位值 ---
+  function extractSlotValues(template, example) {
+    var slotRegex = /\[([^\]]+)\]/g;
+    var literalParts = [];
+    var lastIdx = 0;
+    var m;
+    while ((m = slotRegex.exec(template)) !== null) {
+      literalParts.push(template.slice(lastIdx, m.index));
+      lastIdx = m.index + m[0].length;
+    }
+    literalParts.push(template.slice(lastIdx));
+
+    var values = [];
+    var pos = 0;
+    var slotCount = literalParts.length - 1;
+    for (var i = 0; i < slotCount; i++) {
+      var prefix = literalParts[i];
+      var suffix = literalParts[i + 1];
+
+      // 找前缀锚点（精确 → 前2字模糊）
+      var pIdx = -1;
+      if (prefix && prefix.trim()) {
+        pIdx = example.indexOf(prefix.trim(), pos);
+        if (pIdx === -1 && prefix.trim().length > 2) {
+          pIdx = example.indexOf(prefix.trim().slice(0, 2), pos);
+        }
+      }
+      if (pIdx !== -1) {
+        // 精确匹配：推进整个前缀长度；模糊匹配：也推进整个前缀长度
+        pos = pIdx + prefix.trim().length;
+      } else if (i === 0 && prefix && prefix.trim()) {
+        // 前缀在开头，跳过
+        var pTrim = prefix.trim();
+        if (example.slice(0, pTrim.length) === pTrim) pos = pTrim.length;
+      }
+
+      // 找后缀锚点
+      var sIdx = -1;
+      if (suffix && suffix.trim()) {
+        var sTrim = suffix.trim();
+        sIdx = example.indexOf(sTrim, pos);
+        if (sIdx === -1 && sTrim.length > 2) {
+          sIdx = example.indexOf(sTrim.slice(0, 2), pos);
+        }
+      }
+      if (sIdx === -1) sIdx = example.length;
+
+      values.push(example.slice(pos, sIdx).replace(/^[，,、\s]+|[，,、\s]+$/g, ''));
+      pos = sIdx;
+    }
+    return values;
+  }
+
+  // --- 核心函数：把用户话题代入模板，生成标题 ---
+  function generateTitleFromTemplate(template, example, topic) {
+    var topicShort = simplifyTopic(topic);
+
+    // 提取所有槽位
+    var slotRegex = /\[([^\]]+)\]/g;
+    var slots = [];
+    var m;
+    while ((m = slotRegex.exec(template)) !== null) {
+      slots.push({ full: m[0], name: m[1] });
+    }
+    if (slots.length === 0) return template;
+
+    // 判断是否所有槽位相同（如 [行动] [行动] [行动]）
+    var allSame = slots.every(function (s) { return s.name === slots[0].name; });
+
+    // 结构性槽位默认值
+    var STRUCTURAL_DEFAULTS = {
+      '数字': '3', '专家': '行业专家', '一群人': '达人',
+      '目标': '目标', '好结果': '反而赚到了'
+    };
+    function isStructural(name) {
+      return Object.keys(STRUCTURAL_DEFAULTS).some(function (k) { return name.indexOf(k) !== -1; });
+    }
+
+    // 从行业示例提取槽位值
+    var exValues = extractSlotValues(template, example);
+
+    var result = template;
+
+    if (allSame && slots.length > 1) {
+      // 相同槽位重复：第一个用话题，其余从行业示例取
+      var firstEnd2 = template.indexOf(slots[0].full) + slots[0].full.length;
+      var secondStart2 = template.indexOf(slots[1].full, firstEnd2);
+      var templateSep2 = template.slice(firstEnd2, secondStart2);
+
+      // 如果模板分隔符只是空格，从示例取顿号/逗号
+      if (templateSep2.trim() === '') {
+        var sepMatch2 = example.match(/[，,、]/);
+        templateSep2 = sepMatch2 ? sepMatch2[0] : ' ';
+      }
+
+      // 取前缀和后缀
+      var lastSlotEnd2 = template.lastIndexOf(slots[slots.length - 1].full) + slots[slots.length - 1].full.length;
+      var suffix2 = template.slice(lastSlotEnd2);
+      var prefix2 = template.slice(0, template.indexOf(slots[0].full));
+
+      // 直接从示例中拆分出各槽位的值
+      var exTrimmed = example;
+      if (prefix2 && prefix2.trim() && exTrimmed.startsWith(prefix2.trim())) {
+        exTrimmed = exTrimmed.slice(prefix2.trim().length);
+      }
+      if (suffix2 && suffix2.trim() && exTrimmed.endsWith(suffix2.trim())) {
+        exTrimmed = exTrimmed.slice(0, -suffix2.trim().length);
+      }
+      var exParts2 = exTrimmed.split(/[，,、]/).filter(function (p) { return p.trim().length > 0; }).map(function (p) { return p.trim(); });
+
+      var values2 = [];
+      for (var i2 = 0; i2 < slots.length; i2++) {
+        if (i2 === 0) {
+          values2.push(topicShort);
+        } else if (exParts2[i2]) {
+          values2.push(exParts2[i2]);
+        } else {
+          values2.push(topicShort);
+        }
+      }
+      result = prefix2 + values2.join(templateSep2) + suffix2;
+    } else {
+      // 不同槽位：内容槽用话题，结构槽用默认值或示例值
+      var firstContentDone = false;
+      for (var i3 = 0; i3 < slots.length; i3++) {
+        var rep;
+        if (isStructural(slots[i3].name)) {
+          rep = exValues[i3] || STRUCTURAL_DEFAULTS[Object.keys(STRUCTURAL_DEFAULTS).find(function (k) { return slots[i3].name.indexOf(k) !== -1; })] || '';
+        } else if (!firstContentDone) {
+          rep = topicShort;
+          firstContentDone = true;
+        } else {
+          rep = exValues[i3] || '踩了坑';
+        }
+        result = result.replace(slots[i3].full, rep);
+      }
+    }
+
+    // 清理多余空格：合并连续空格，去掉标点前空格，去掉中文间空格
+    result = result.replace(/\s+/g, ' ')
+      .replace(/\s+([，。？！、])/g, '$1')
+      .replace(/([\u4e00-\u9fff])\s+([\u4e00-\u9fff])/g, '$1$2')
+      .replace(/([\u4e00-\u9fff])\s+([\u4e00-\u9fff])/g, '$1$2')
+      .trim();
+    return result;
+  }
+
   function matchTitleFormulas(topic, industry) {
     var t = (topic || '').trim();
     var ind = (industry || '').trim();
@@ -408,11 +563,16 @@
       } else {
         reason = '通用爆款，把你的话题代入模板';
       }
+
+      // 用用户话题 + 模板生成标题（不再直接返回行业示例）
+      var generatedTitle = generateTitleFromTemplate(s.f.template, s.ex.text, t);
+
       return {
         id: s.f.id,
         category: s.f.category,
         template: s.f.template,
-        titleText: s.ex.text,
+        titleText: generatedTitle,
+        industryRef: s.ex.text,
         reason: reason
       };
     });
@@ -443,6 +603,7 @@
         '</div>' +
         '<div class="rc-meta">公式 #' + m.id + ' · ' + escapeHtml(m.category) + '</div>' +
         '<div class="rc-desc">' + escapeHtml(m.reason) + '</div>' +
+        (m.industryRef ? '<div class="rc-quote">行业参考：' + escapeHtml(m.industryRef) + '</div>' : '') +
         '<div class="rc-quote">原始模板：' + escapeHtml(m.template) + '</div>' +
         '</div>';
     });
@@ -457,6 +618,7 @@
         '<button class="copy-btn" data-copy="' + escapeAttr(m.titleText) + '">复制</button>' +
         '</div>' +
         '<div class="rc-meta">公式 #' + m.id + ' · ' + escapeHtml(m.category) + '</div>' +
+        (m.industryRef ? '<div class="rc-quote">行业参考：' + escapeHtml(m.industryRef) + '</div>' : '') +
         '</div>';
     });
 
